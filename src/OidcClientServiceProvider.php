@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Bambamboole\LaravelOidcClient;
 
+use Bambamboole\LaravelOidcClient\Discovery\OidcDiscovery;
 use Illuminate\Support\ServiceProvider;
 
 class OidcClientServiceProvider extends ServiceProvider
@@ -13,6 +14,7 @@ class OidcClientServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/oidc-client.php', 'oidc-client');
 
         $this->app->singleton(OidcClientManager::class);
+        $this->app->singleton(OidcDiscovery::class);
     }
 
     public function boot(): void
