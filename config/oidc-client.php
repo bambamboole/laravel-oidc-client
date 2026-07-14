@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Bambamboole\LaravelOidcClient\Http\Controllers\BackchannelLogoutController;
 use Bambamboole\LaravelOidcClient\Http\Controllers\OidcCallbackController;
 use Bambamboole\LaravelOidcClient\Http\Controllers\OidcLoginController;
 use Bambamboole\LaravelOidcClient\Http\Controllers\OidcLogoutController;
@@ -64,6 +65,11 @@ return [
             'controller' => OidcLogoutController::class,
             'middleware' => ['web'],
         ],
+        Handler::BackchannelLogout->value => [
+            'route' => 'oidc/backchannel-logout',
+            'controller' => BackchannelLogoutController::class,
+            'middleware' => ['throttle:60,1'],
+        ],
     ],
 
     'redirect_after_login' => env('OIDC_RP_HOME', '/dashboard'),
@@ -93,4 +99,22 @@ return [
     */
 
     'leeway' => (int) env('OIDC_RP_LEEWAY', 60),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Back-channel logout
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the package registers an endpoint that accepts OIDC
+    | back-channel logout tokens from the provider and terminates the
+    | matching local session(s).
+    |
+    */
+
+    'backchannel_logout' => [
+        'enabled' => env('OIDC_RP_BACKCHANNEL_LOGOUT_ENABLED', false),
+        'auto_middleware' => true,
+        'middleware_group' => 'web',
+        'retention_minutes' => (int) env('OIDC_RP_BACKCHANNEL_LOGOUT_RETENTION', (int) env('SESSION_LIFETIME', 120)),
+    ],
 ];

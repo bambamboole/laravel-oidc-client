@@ -27,6 +27,11 @@ class OidcClientManager
     public function routes(): void
     {
         foreach (Handler::cases() as $handler) {
+            if ($handler === Handler::BackchannelLogout
+                && ! config('oidc-client.backchannel_logout.enabled', false)) {
+                continue;
+            }
+
             $config = $handler->config();
 
             if ($config === false) {
