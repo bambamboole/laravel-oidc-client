@@ -22,6 +22,7 @@ enum Handler: string
     case Login = 'login';
     case Callback = 'login.callback';
     case Logout = 'logout';
+    case BackchannelLogout = 'oidc.backchannel-logout';
 
     /**
      * Resolve this handler's configuration, or `false` when it is disabled (or
@@ -49,7 +50,7 @@ enum Handler: string
     public function method(): string
     {
         return match ($this) {
-            self::Logout => 'post',
+            self::Logout, self::BackchannelLogout => 'post',
             default => 'get',
         };
     }

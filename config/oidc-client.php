@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Bambamboole\LaravelOidcClient\Http\Controllers\BackchannelLogoutController;
 use Bambamboole\LaravelOidcClient\Http\Controllers\OidcCallbackController;
 use Bambamboole\LaravelOidcClient\Http\Controllers\OidcLoginController;
 use Bambamboole\LaravelOidcClient\Http\Controllers\OidcLogoutController;
@@ -63,6 +64,11 @@ return [
             'route' => 'logout',
             'controller' => OidcLogoutController::class,
             'middleware' => ['web'],
+        ],
+        Handler::BackchannelLogout->value => [
+            'route' => 'oidc/backchannel-logout',
+            'controller' => BackchannelLogoutController::class,
+            'middleware' => ['throttle:60,1'],
         ],
     ],
 
