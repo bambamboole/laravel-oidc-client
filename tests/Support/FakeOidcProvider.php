@@ -71,6 +71,30 @@ class FakeOidcProvider
     /**
      * @param  array<string, mixed>  $claims
      */
+    public function logoutToken(array $claims, string $kid): string
+    {
+        $builder = (new Builder(new JoseEncoder, ChainedFormatter::default()))
+            ->withHeader('kid', $kid)
+            ->withHeader('typ', 'logout+jwt');
+
+        foreach ($claims as $name => $value) {
+            $builder = match ($name) {
+                'iss' => $builder->issuedBy((string) $value),
+                'sub' => $builder->relatedTo((string) $value),
+                'aud' => $builder->permittedFor(...(array) $value),
+                'exp' => $builder->expiresAt($this->toDateTime($value)),
+                'iat' => $builder->issuedAt($this->toDateTime($value)),
+                'jti' => $builder->identifiedBy((string) $value),
+                default => $builder->withClaim($name, $value),
+            };
+        }
+
+        return $builder->getToken(new Sha256, InMemory::plainText((string) $this->privateKey->toString('PKCS8')))->toString();
+    }
+
+    /**
+     * @param  array<string, mixed>  $claims
+     */
     public function rawIdToken(array $claims, string $kid): string
     {
         $header = $this->base64Url((string) json_encode(['alg' => 'RS256', 'typ' => 'JWT', 'kid' => $kid], JSON_THROW_ON_ERROR));
