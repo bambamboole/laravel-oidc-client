@@ -6,26 +6,24 @@ namespace Bambamboole\LaravelOidcClient\Http\Controllers;
 
 use Bambamboole\LaravelOidcClient\Discovery\OidcDiscovery;
 use Bambamboole\LaravelOidcClient\Exceptions\OidcClientException;
+use Bambamboole\LaravelOidcClient\OidcClientManager;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class OidcLogoutController
 {
-    public function __invoke(Request $request, OidcDiscovery $discovery): RedirectResponse
+    public function __invoke(Request $request, OidcDiscovery $discovery, OidcClientManager $manager): RedirectResponse
     {
         $idToken = $request->session()->get('oidc-client.tokens.id_token');
 
-        Auth::guard((string) config('oidc-client.login_guard', 'web'))->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        $manager->terminateLocalSession($request);
 
         try {
             $endSession = $discovery->metadata()->endSessionEndpoint;
         } catch (ConnectionException|RequestException|OidcClientException) {
-            return redirect('/');
+            $endSession = null;
         }
 
         if ($endSession === null) {

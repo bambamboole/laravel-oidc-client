@@ -10,9 +10,8 @@ use Bambamboole\LaravelOidcClient\Token\IdTokenValidator;
 use Illuminate\Http\Client\Factory as Http;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Lcobucci\JWT\Encoding\JoseEncoder;
 
 class RelyingParty
 {
@@ -21,6 +20,7 @@ class RelyingParty
         private readonly Http $http,
         private readonly IdTokenValidator $validator,
         private readonly OidcClientManager $manager,
+        private readonly BackchannelLogoutStore $backchannelLogout,
     ) {}
 
     public function redirect(): RedirectResponse
@@ -30,11 +30,13 @@ class RelyingParty
         $state = Str::random(40);
         $nonce = Str::random(40);
         $verifier = Str::random(64);
-        $challenge = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
+        $challenge = (new JoseEncoder)->base64UrlEncode(hash('sha256', $verifier, true));
 
-        session()->put('oidc-client.state', $state);
-        session()->put('oidc-client.nonce', $nonce);
-        session()->put('oidc-client.code_verifier', $verifier);
+        session()->put([
+            'oidc-client.state' => $state,
+            'oidc-client.nonce' => $nonce,
+            'oidc-client.code_verifier' => $verifier,
+        ]);
 
         $query = http_build_query([
             'response_type' => 'code',
@@ -76,16 +78,21 @@ class RelyingParty
 
         $metadata = $this->discovery->metadata();
 
-        $clientSecret = config('oidc-client.client_secret');
-
-        $response = $this->http->asForm()->post($metadata->tokenEndpoint, array_filter([
+        $payload = [
             'grant_type' => 'authorization_code',
             'code' => $code,
             'redirect_uri' => (string) config('oidc-client.redirect_uri'),
             'client_id' => (string) config('oidc-client.client_id'),
-            'client_secret' => is_string($clientSecret) && $clientSecret !== '' ? $clientSecret : null,
             'code_verifier' => $verifier,
-        ], fn (mixed $value): bool => $value !== null));
+        ];
+
+        $clientSecret = config('oidc-client.client_secret');
+
+        if (is_string($clientSecret) && $clientSecret !== '') {
+            $payload['client_secret'] = $clientSecret;
+        }
+
+        $response = $this->http->asForm()->post($metadata->tokenEndpoint, $payload);
 
         if ($response->failed()) {
             throw new OidcClientException('The token endpoint rejected the code exchange.');
@@ -105,7 +112,7 @@ class RelyingParty
             throw new OidcClientException('No local user matched the id_token subject.');
         }
 
-        Auth::guard((string) config('oidc-client.login_guard', 'web'))->login($user);
+        $this->manager->guard()->login($user);
 
         session()->put('oidc-client.tokens', [
             'access_token' => $response->json('access_token'),
@@ -120,14 +127,10 @@ class RelyingParty
 
             if (is_string($sid) && $sid !== '') {
                 $request->session()->put('oidc-client.sid', $sid);
-                Cache::put(
-                    "oidc-client:bclo:session:{$sid}",
-                    $request->session()->getId(),
-                    now()->addMinutes((int) config('oidc-client.backchannel_logout.retention_minutes', 120)),
-                );
+                $this->backchannelLogout->registerSession($sid, $request->session()->getId());
             }
         }
 
-        return redirect()->intended((string) config('oidc-client.redirect_after_login', '/dashboard'));
+        return $this->manager->redirectAfterLogin();
     }
 }

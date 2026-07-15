@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Bambamboole\LaravelOidcClient\Tests;
 
+use Bambamboole\LaravelOidcClient\BackchannelLogoutStore;
 use Bambamboole\LaravelOidcClient\Http\Controllers\BackchannelLogoutController;
 use Bambamboole\LaravelOidcClient\Tests\Support\BackchannelLogoutEnabledTestCase;
 use Bambamboole\LaravelOidcClient\Tests\Support\FakeOidcProvider;
@@ -85,7 +86,7 @@ class BackchannelLogoutEndpointTest extends BackchannelLogoutEnabledTestCase
         Session::shouldReceive('getHandler')->andReturn($handler);
 
         $request = Request::create('/oidc/backchannel-logout', 'POST', ['logout_token' => $this->validLogoutToken()]);
-        $response = app(BackchannelLogoutController::class)->__invoke($request, app(LogoutTokenValidator::class));
+        $response = app(BackchannelLogoutController::class)->__invoke($request, app(LogoutTokenValidator::class), app(BackchannelLogoutStore::class));
 
         $this->assertSame(200, $response->getStatusCode());
         $handler->shouldHaveReceived('destroy', ['the-session-id']);
