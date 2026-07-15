@@ -11,23 +11,21 @@ use Throwable;
 
 class JwksKeyResolver
 {
+    /** @var array<string, string> */
+    private array $pemByKid = [];
+
     public function __construct(private readonly OidcDiscovery $discovery) {}
 
     public function publicKeyPem(string $kid): string
     {
-        $pem = $this->findKeyInJwks($kid, $this->discovery->jwks());
+        return $this->pemByKid[$kid] ??= $this->resolve($kid);
+    }
 
-        if ($pem !== null) {
-            return $pem;
-        }
-
-        $pem = $this->findKeyInJwks($kid, $this->discovery->jwks(fresh: true));
-
-        if ($pem !== null) {
-            return $pem;
-        }
-
-        throw new OidcClientException("No JWKS key matches the token kid [{$kid}].");
+    private function resolve(string $kid): string
+    {
+        return $this->findKeyInJwks($kid, $this->discovery->jwks())
+            ?? $this->findKeyInJwks($kid, $this->discovery->jwks(fresh: true))
+            ?? throw new OidcClientException("No JWKS key matches the token kid [{$kid}].");
     }
 
     /**

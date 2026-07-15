@@ -26,10 +26,15 @@ enum Handler: string
 
     /**
      * Resolve this handler's configuration, or `false` when it is disabled (or
-     * absent from config).
+     * absent from config). The back-channel logout endpoint is additionally
+     * gated behind its feature flag.
      */
     public function config(): HandlerConfig|false
     {
+        if ($this === self::BackchannelLogout && ! config('oidc-client.backchannel_logout.enabled', false)) {
+            return false;
+        }
+
         /** @var array{route: string, controller: string|array{0: class-string, 1: string}, middleware?: array<int, string>}|false $config */
         $config = config('oidc-client.handlers', [])[$this->value] ?? false;
 

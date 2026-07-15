@@ -10,6 +10,8 @@ use Illuminate\Http\Client\Factory as Http;
 
 class OidcDiscovery
 {
+    private ?ProviderMetadata $metadata = null;
+
     public function __construct(
         private readonly Http $http,
         private readonly Cache $cache,
@@ -17,6 +19,10 @@ class OidcDiscovery
 
     public function metadata(): ProviderMetadata
     {
+        if ($this->metadata !== null) {
+            return $this->metadata;
+        }
+
         $issuer = $this->issuer();
 
         $doc = $this->cache->remember(
@@ -39,7 +45,7 @@ class OidcDiscovery
             throw new OidcClientException('The discovery document issuer does not match the configured issuer.');
         }
 
-        return $metadata;
+        return $this->metadata = $metadata;
     }
 
     /**
@@ -47,17 +53,17 @@ class OidcDiscovery
      */
     public function jwks(bool $fresh = false): array
     {
-        $metadata = $this->metadata();
+        $key = 'oidc-client:jwks:'.$this->issuer();
 
         if ($fresh) {
-            $this->cache->forget('oidc-client:jwks:'.$metadata->issuer);
+            $this->cache->forget($key);
         }
 
         return $this->cache->remember(
-            'oidc-client:jwks:'.$metadata->issuer,
+            $key,
             $this->ttl(),
-            function () use ($metadata): array {
-                $keys = $this->http->get($metadata->jwksUri)->throw()->json('keys', []);
+            function (): array {
+                $keys = $this->http->get($this->metadata()->jwksUri)->throw()->json('keys', []);
 
                 if (! is_array($keys)) {
                     throw new OidcClientException('The OIDC JWKS response was not a JSON object.');

@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace Bambamboole\LaravelOidcClient\Http\Middleware;
 
+use Bambamboole\LaravelOidcClient\BackchannelLogoutStore;
+use Bambamboole\LaravelOidcClient\OidcClientManager;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnforceBackchannelLogout
 {
+    public function __construct(
+        private readonly BackchannelLogoutStore $store,
+        private readonly OidcClientManager $manager,
+    ) {}
+
     public function handle(Request $request, Closure $next): Response
     {
         if (! config('oidc-client.backchannel_logout.enabled', false) || ! $request->hasSession()) {
@@ -20,10 +25,8 @@ class EnforceBackchannelLogout
 
         $sid = $request->session()->get('oidc-client.sid');
 
-        if (is_string($sid) && $sid !== '' && Cache::has("oidc-client:bclo:revoked:{$sid}")) {
-            Auth::guard((string) config('oidc-client.login_guard', 'web'))->logout();
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
+        if (is_string($sid) && $sid !== '' && $this->store->isRevoked($sid)) {
+            $this->manager->terminateLocalSession($request);
         }
 
         return $next($request);

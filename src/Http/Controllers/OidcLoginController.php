@@ -4,18 +4,16 @@ declare(strict_types=1);
 
 namespace Bambamboole\LaravelOidcClient\Http\Controllers;
 
+use Bambamboole\LaravelOidcClient\OidcClientManager;
 use Bambamboole\LaravelOidcClient\RelyingParty;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Auth;
 
 class OidcLoginController
 {
-    public function __invoke(RelyingParty $relyingParty): RedirectResponse
+    public function __invoke(RelyingParty $relyingParty, OidcClientManager $manager): RedirectResponse
     {
-        $guard = (string) config('oidc-client.login_guard', 'web');
-
-        if (Auth::guard($guard)->check()) {
-            return redirect()->intended((string) config('oidc-client.redirect_after_login', '/dashboard'));
+        if ($manager->guard()->check()) {
+            return $manager->redirectAfterLogin();
         }
 
         return $relyingParty->redirect();
