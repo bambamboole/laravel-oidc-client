@@ -152,3 +152,25 @@ it('asserts a back-channel logout was processed for a sid', function () {
 
     $fake->assertBackchannelLogoutProcessed('s-proc');
 });
+
+it('keeps flow assertions bound to the factory that actually handled a prior request', function () {
+    // Regression test for the factory-swap bug: applyHttpStubs() used to
+    // forget/rebuild the HttpFactory singleton on every customizer call. A
+    // customizer invoked after RelyingParty had already resolved the old
+    // factory left assertCodeExchanged()/assertCodeNotExchanged() reading
+    // the newest (unrelated, empty) factory's request history instead of
+    // the one RelyingParty actually made the request through.
+    $fake = OidcClient::fake();
+    $user = User::create(['name' => 'M', 'email' => 'm@example.com', 'password' => 'secret']);
+
+    $this->withSession($fake->callbackContext())
+        ->get($fake->loginAs($user))
+        ->assertRedirect(config('oidc-client.redirect_after_login', '/dashboard'));
+
+    $this->assertAuthenticatedAs($user);
+
+    // Apply a customizer after the exchange already happened.
+    $fake->withoutEndSessionEndpoint();
+
+    $fake->assertCodeExchanged();
+});

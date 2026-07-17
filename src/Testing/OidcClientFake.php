@@ -12,8 +12,8 @@ use Bambamboole\LaravelOidcClient\Routing\Handler;
 use Bambamboole\LaravelOidcClient\Token\IdTokenValidator;
 use Bambamboole\LaravelOidcClient\Token\JwksKeyResolver;
 use Bambamboole\LaravelOidcClient\Token\LogoutTokenValidator;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -66,7 +66,7 @@ class OidcClientFake
     {
         $fake = new self(new FakeOidcProvider);
         $fake->reset();
-        $fake->applyHttpStubs();
+        $fake->installStub();
 
         app()->instance(self::class, $fake);
 
@@ -76,7 +76,6 @@ class OidcClientFake
     public function forUser(Authenticatable $user): static
     {
         $this->subject = (string) $user->getAuthIdentifier();
-        $this->applyHttpStubs();
 
         return $this;
     }
@@ -85,7 +84,6 @@ class OidcClientFake
     {
         $this->issuer = rtrim($issuer, '/');
         $this->reset();
-        $this->applyHttpStubs();
 
         return $this;
     }
@@ -94,7 +92,6 @@ class OidcClientFake
     {
         $this->clientId = $clientId;
         config()->set('oidc-client.client_id', $clientId);
-        $this->applyHttpStubs();
 
         return $this;
     }
@@ -102,7 +99,6 @@ class OidcClientFake
     public function withoutEndSessionEndpoint(): static
     {
         $this->endSessionEnabled = false;
-        $this->applyHttpStubs();
 
         return $this;
     }
@@ -110,7 +106,6 @@ class OidcClientFake
     public function failTokenExchange(int $status = 400): static
     {
         $this->failTokenStatus = $status;
-        $this->applyHttpStubs();
 
         return $this;
     }
@@ -118,7 +113,6 @@ class OidcClientFake
     public function withInvalidSignature(): static
     {
         $this->rogueProvider = new FakeOidcProvider;
-        $this->applyHttpStubs();
 
         return $this;
     }
@@ -154,15 +148,15 @@ class OidcClientFake
 
     /**
      * Point the token endpoint's id_token at $user and return the callback URL.
-     * Seed the session with callbackContext() in the same chain.
+     * Seed the session with callbackContext() in the same chain. Each call
+     * replaces the prior claims rather than accumulating them.
      *
      * @param  array<string, mixed>  $claims
      */
     public function loginAs(Authenticatable $user, array $claims = []): string
     {
         $this->subject = (string) $user->getAuthIdentifier();
-        $this->defaultClaims = array_merge($this->defaultClaims, $claims);
-        $this->applyHttpStubs();
+        $this->defaultClaims = $claims;
 
         return $this->callbackUrl();
     }
@@ -227,15 +221,35 @@ class OidcClientFake
         Cache::forget('oidc-client:jwks:'.$this->issuer);
     }
 
-    private function applyHttpStubs(): void
+    /**
+     * Register a single closure stub that reads live state from $this at
+     * request time. Unlike Http::fake([...]) with a fixed URL map, this
+     * survives customizers called after a request has already resolved the
+     * HTTP factory (RelyingParty and OidcDiscovery constructor-inject it),
+     * so a customizer applied between two requests in the same test still
+     * takes effect on the second request.
+     */
+    private function installStub(): void
     {
-        // Http::fake() accumulates stubs and resolves the first matching one,
-        // so a re-stub with changed responses (e.g. the failure customizers)
-        // would otherwise merge behind the stubs registered by start(). Drop
-        // the singleton factory first so each re-stub fully replaces the prior.
-        app()->forgetInstance(HttpFactory::class);
-        Http::clearResolvedInstance(HttpFactory::class);
+        Http::fake(fn (Request $request): ?PromiseInterface => $this->respondTo($request));
+    }
 
+    private function respondTo(Request $request): ?PromiseInterface
+    {
+        return match ($request->url()) {
+            $this->issuer.'/.well-known/openid-configuration' => Http::response($this->discoveryDocument()),
+            $this->issuer.'/.well-known/jwks.json' => Http::response(['keys' => $this->provider->rsaJwks(self::KID)]),
+            $this->issuer.'/oauth/token' => $this->tokenResponse(),
+            $this->issuer.'/oauth/logout' => Http::response('', 200),
+            default => null,
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function discoveryDocument(): array
+    {
         $discovery = [
             'issuer' => $this->issuer,
             'authorization_endpoint' => $this->issuer.'/oauth/authorize',
@@ -247,21 +261,21 @@ class OidcClientFake
             $discovery['end_session_endpoint'] = $this->issuer.'/oauth/logout';
         }
 
-        $token = $this->failTokenStatus !== null
-            ? Http::response([], $this->failTokenStatus)
-            : Http::response([
-                'access_token' => 'oidc-fake-access-token',
-                'refresh_token' => 'oidc-fake-refresh-token',
-                'id_token' => $this->idToken(),
-                'token_type' => 'Bearer',
-                'expires_in' => 3600,
-            ]);
+        return $discovery;
+    }
 
-        Http::fake([
-            $this->issuer.'/.well-known/openid-configuration' => Http::response($discovery),
-            $this->issuer.'/.well-known/jwks.json' => Http::response(['keys' => $this->provider->rsaJwks(self::KID)]),
-            $this->issuer.'/oauth/token' => $token,
-            $this->issuer.'/oauth/logout' => Http::response('', 200),
+    private function tokenResponse(): PromiseInterface
+    {
+        if ($this->failTokenStatus !== null) {
+            return Http::response([], $this->failTokenStatus);
+        }
+
+        return Http::response([
+            'access_token' => 'oidc-fake-access-token',
+            'refresh_token' => 'oidc-fake-refresh-token',
+            'id_token' => $this->idToken(),
+            'token_type' => 'Bearer',
+            'expires_in' => 3600,
         ]);
     }
 
