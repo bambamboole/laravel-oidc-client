@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Bambamboole\LaravelOidcClient\Tests;
 
+use Bambamboole\LaravelOidcClient\Testing\FakeOidcProvider;
 use Bambamboole\LaravelOidcClient\Tests\Support\BackchannelLogoutEnabledTestCase;
-use Bambamboole\LaravelOidcClient\Tests\Support\FakeOidcProvider;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
