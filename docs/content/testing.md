@@ -11,6 +11,12 @@ the client's resolved services so test config takes effect, and returns an
 `OidcClientFake` for minting tokens, seeding the callback session, and asserting
 the flow.
 
+The package's routes — including `login` and `login.callback` — register only
+when `enabled` is on (see [Configuration](/configuration/)), so a consumer
+test environment must set `OIDC_RP_ENABLED=true` or
+`config(['oidc-client.enabled' => true])` before `route('login')` or
+`callbackUrl()` will resolve.
+
 ## Logging a user in
 
 The callback reads a `state`/`nonce`/`code_verifier` triplet from the session.

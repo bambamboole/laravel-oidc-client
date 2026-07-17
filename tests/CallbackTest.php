@@ -6,6 +6,7 @@ use Bambamboole\LaravelOidcClient\Facades\OidcClient;
 use Bambamboole\LaravelOidcClient\Testing\OidcClientFake;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Workbench\App\Models\User;
 
 beforeEach(function () {
@@ -25,7 +26,10 @@ it('completes the callback and logs the user into the web guard', function () {
 
     $this->assertAuthenticatedAs($this->user);
 
-    $this->fake->assertCodeExchanged();
+    Http::assertSent(fn ($request) => $request->url() === config('oidc-client.issuer').'/oauth/token'
+        && $request['grant_type'] === 'authorization_code'
+        && $request['code_verifier'] === OidcClientFake::VERIFIER
+        && $request['client_secret'] === 'secret-xyz');
 });
 
 it('records the sid and a session pointer when backchannel logout is enabled', function () {
