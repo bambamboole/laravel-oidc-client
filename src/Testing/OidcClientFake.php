@@ -7,6 +7,7 @@ namespace Bambamboole\LaravelOidcClient\Testing;
 use Bambamboole\LaravelOidcClient\Discovery\OidcDiscovery;
 use Bambamboole\LaravelOidcClient\Facades\OidcClient;
 use Bambamboole\LaravelOidcClient\RelyingParty;
+use Bambamboole\LaravelOidcClient\Routing\Handler;
 use Bambamboole\LaravelOidcClient\Token\IdTokenValidator;
 use Bambamboole\LaravelOidcClient\Token\JwksKeyResolver;
 use Bambamboole\LaravelOidcClient\Token\LogoutTokenValidator;
@@ -114,6 +115,50 @@ class OidcClientFake
         $this->applyHttpStubs();
 
         return $this;
+    }
+
+    /**
+     * Seed values for the callback session triplet. Pass the result to the
+     * test's withSession(): the facade fake cannot inject request session state.
+     *
+     * @param  array<string, string>  $overrides
+     * @return array<string, string>
+     */
+    public function callbackContext(array $overrides = []): array
+    {
+        return array_merge([
+            'oidc-client.state' => self::STATE,
+            'oidc-client.nonce' => self::NONCE,
+            'oidc-client.code_verifier' => self::VERIFIER,
+        ], $overrides);
+    }
+
+    /**
+     * The callback URL carrying a fake authorization code and the seeded state.
+     *
+     * @param  array<string, string>  $query
+     */
+    public function callbackUrl(array $query = []): string
+    {
+        return route(Handler::Callback->value, array_merge([
+            'code' => 'oidc-fake-code',
+            'state' => self::STATE,
+        ], $query));
+    }
+
+    /**
+     * Point the token endpoint's id_token at $user and return the callback URL.
+     * Seed the session with callbackContext() in the same chain.
+     *
+     * @param  array<string, mixed>  $claims
+     */
+    public function loginAs(Authenticatable $user, array $claims = []): string
+    {
+        $this->subject = (string) $user->getAuthIdentifier();
+        $this->defaultClaims = array_merge($this->defaultClaims, $claims);
+        $this->applyHttpStubs();
+
+        return $this->callbackUrl();
     }
 
     /**

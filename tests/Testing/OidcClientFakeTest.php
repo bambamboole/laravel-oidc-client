@@ -9,6 +9,7 @@ use Bambamboole\LaravelOidcClient\Testing\OidcClientFake;
 use Bambamboole\LaravelOidcClient\Token\IdTokenValidator;
 use Bambamboole\LaravelOidcClient\Token\LogoutTokenValidator;
 use Illuminate\Support\Facades\Http;
+use Workbench\App\Models\User;
 
 it('installs the fake and stubs discovery, jwks and token endpoints', function () {
     OidcClient::fake();
@@ -68,3 +69,44 @@ it('mints an id_token the validator rejects when signed by a rogue provider', fu
 
     app(IdTokenValidator::class)->validate($fake->idToken(), OidcClientFake::NONCE);
 })->throws(OidcClientException::class);
+
+it('logs a user in through the callback with two lines of setup', function () {
+    $fake = OidcClient::fake();
+    $user = User::create(['name' => 'M', 'email' => 'm@example.com', 'password' => 'secret']);
+
+    $this->withSession($fake->callbackContext())
+        ->get($fake->loginAs($user))
+        ->assertRedirect(config('oidc-client.redirect_after_login', '/dashboard'));
+
+    $this->assertAuthenticatedAs($user);
+});
+
+it('drives a failed token exchange to the login route without logging in', function () {
+    $fake = OidcClient::fake()->failTokenExchange();
+    User::create(['name' => 'M', 'email' => 'm@example.com', 'password' => 'secret']);
+
+    $this->withSession($fake->callbackContext())
+        ->get($fake->callbackUrl())
+        ->assertRedirect(route('login'));
+
+    $this->assertGuest();
+});
+
+it('rejects an id_token signed by a key absent from the jwks', function () {
+    $fake = OidcClient::fake()->withInvalidSignature();
+    $user = User::create(['name' => 'M', 'email' => 'm@example.com', 'password' => 'secret']);
+
+    $this->withSession($fake->callbackContext())
+        ->get($fake->loginAs($user))
+        ->assertRedirect(route('login'));
+
+    $this->assertGuest();
+});
+
+it('drops the end_session_endpoint so logout falls back home', function () {
+    $fake = OidcClient::fake()->withoutEndSessionEndpoint();
+    $user = User::create(['name' => 'M', 'email' => 'm@example.com', 'password' => 'secret']);
+
+    $this->actingAs($user)->post(route('logout'))->assertRedirect('/');
+    $this->assertGuest();
+});
