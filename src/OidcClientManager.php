@@ -23,9 +23,10 @@ class OidcClientManager
     /**
      * Register every enabled {@see Handler} as a route.
      *
-     * The list of endpoints and their intrinsic HTTP verb come from the
-     * {@see Handler} enum; each endpoint's path, controller, and middleware
-     * (or whether it is disabled) come from `oidc-client.handlers`.
+     * The list of endpoints, their intrinsic HTTP verb, and their default
+     * path/controller/middleware come from the {@see Handler} enum; sparse
+     * per-endpoint overrides and the global `routes` settings (or whether an
+     * endpoint is disabled) come from config via {@see Handler::config()}.
      */
     public function routes(): void
     {
