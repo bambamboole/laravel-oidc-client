@@ -2,12 +2,6 @@
 
 declare(strict_types=1);
 
-use Bambamboole\LaravelOidcClient\Http\Controllers\BackchannelLogoutController;
-use Bambamboole\LaravelOidcClient\Http\Controllers\OidcCallbackController;
-use Bambamboole\LaravelOidcClient\Http\Controllers\OidcLoginController;
-use Bambamboole\LaravelOidcClient\Http\Controllers\OidcLogoutController;
-use Bambamboole\LaravelOidcClient\Routing\Handler;
-
 return [
     /*
     |--------------------------------------------------------------------------
@@ -30,6 +24,13 @@ return [
 
     'client_secret' => env('OIDC_RP_CLIENT_SECRET'),
 
+    /*
+    | The redirect_uri sent to the provider during the code flow. Leave empty to
+    | derive it from the `login.callback` route, so a configured `routes.prefix`
+    | can never make the advertised URL diverge from the registered route. Set an
+    | absolute URL only to override that (e.g. behind a proxy where the app URL
+    | is not the public one).
+    */
     'redirect_uri' => env('OIDC_RP_REDIRECT_URI'),
 
     'scopes' => ['openid', 'profile', 'email'],
@@ -38,39 +39,35 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Route handlers
+    | Routes
     |--------------------------------------------------------------------------
     |
-    | Each endpoint the package registers is a single entry keyed by its route
-    | name. The `route` (URI path), `controller`, and `middleware` are yours to
-    | change; set an entry to `false` to disable that endpoint entirely. The
-    | HTTP verb is intrinsic to the endpoint and lives in code, not here, so it
-    | cannot be mis-set. Routes are only registered when `enabled` is true.
+    | Settings applied to every endpoint the package registers. `prefix` is
+    | prepended to each route's path; `middleware` is appended to each route's
+    | middleware. Routes are only registered when `enabled` is true.
     |
     */
 
-    'handlers' => [
-        Handler::Login->value => [
-            'route' => 'login',
-            'controller' => OidcLoginController::class,
-            'middleware' => ['web'],
-        ],
-        Handler::Callback->value => [
-            'route' => 'login/callback',
-            'controller' => OidcCallbackController::class,
-            'middleware' => ['web'],
-        ],
-        Handler::Logout->value => [
-            'route' => 'logout',
-            'controller' => OidcLogoutController::class,
-            'middleware' => ['web'],
-        ],
-        Handler::BackchannelLogout->value => [
-            'route' => 'oidc/backchannel-logout',
-            'controller' => BackchannelLogoutController::class,
-            'middleware' => ['throttle:60,1'],
-        ],
+    'routes' => [
+        'prefix' => '',
+        'middleware' => [],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Route handlers
+    |--------------------------------------------------------------------------
+    |
+    | Sparse, per-endpoint overrides keyed by route name (`login`,
+    | `login.callback`, `logout`, `oidc.backchannel-logout`). Each entry may set
+    | any of `route` (URI path), `controller`, or `middleware`; omitted keys fall
+    | back to the package default, and a `middleware` override replaces (does not
+    | merge with) the default. Set an entry to `false` to disable that endpoint.
+    | The HTTP verb is intrinsic to the endpoint and lives in code, not here.
+    |
+    */
+
+    'handlers' => [],
 
     'redirect_after_login' => env('OIDC_RP_HOME', '/dashboard'),
 
