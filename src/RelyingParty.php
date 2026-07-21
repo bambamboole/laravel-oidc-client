@@ -6,7 +6,6 @@ namespace Bambamboole\LaravelOidcClient;
 
 use Bambamboole\LaravelOidcClient\Discovery\OidcDiscovery;
 use Bambamboole\LaravelOidcClient\Exceptions\OidcClientException;
-use Bambamboole\LaravelOidcClient\Routing\Handler;
 use Bambamboole\LaravelOidcClient\Token\IdTokenValidator;
 use Illuminate\Http\Client\Factory as Http;
 use Illuminate\Http\RedirectResponse;
@@ -42,7 +41,7 @@ class RelyingParty
         $query = http_build_query([
             'response_type' => 'code',
             'client_id' => (string) config('oidc-client.client_id'),
-            'redirect_uri' => $this->redirectUri(),
+            'redirect_uri' => (string) config('oidc-client.redirect_uri'),
             'scope' => implode(' ', (array) config('oidc-client.scopes', ['openid'])),
             'state' => $state,
             'nonce' => $nonce,
@@ -82,7 +81,7 @@ class RelyingParty
         $payload = [
             'grant_type' => 'authorization_code',
             'code' => $code,
-            'redirect_uri' => $this->redirectUri(),
+            'redirect_uri' => (string) config('oidc-client.redirect_uri'),
             'client_id' => (string) config('oidc-client.client_id'),
             'code_verifier' => $verifier,
         ];
@@ -133,20 +132,5 @@ class RelyingParty
         }
 
         return $this->manager->redirectAfterLogin();
-    }
-
-    /**
-     * The redirect_uri advertised to the provider. It defaults to the
-     * `login.callback` route so a configured `routes.prefix` can never make the
-     * advertised URL diverge from the registered route; an explicit
-     * `oidc-client.redirect_uri` overrides it (e.g. behind a proxy).
-     */
-    private function redirectUri(): string
-    {
-        $configured = config('oidc-client.redirect_uri');
-
-        return is_string($configured) && $configured !== ''
-            ? $configured
-            : route(Handler::Callback->value);
     }
 }

@@ -1,13 +1,5 @@
 # Changelog
 
-## [0.4.0](https://github.com/bambamboole/laravel-oidc-client/compare/v0.3.0...v0.4.0) (2026-07-19)
-
-
-### Features
-
-* move route defaults to code and add routes prefix/middleware group ([7ab513b](https://github.com/bambamboole/laravel-oidc-client/commit/7ab513b26360df60542fd936d4f5852708685a80))
-* move route defaults to code and add routes prefix/middleware group ([0942d60](https://github.com/bambamboole/laravel-oidc-client/commit/0942d60a508236acde7f1e2b64022c7fc231f6b6))
-
 ## [0.3.0](https://github.com/bambamboole/laravel-oidc-client/compare/v0.2.0...v0.3.0) (2026-07-17)
 
 

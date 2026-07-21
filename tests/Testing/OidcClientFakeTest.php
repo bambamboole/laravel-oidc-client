@@ -19,15 +19,6 @@ it('installs the fake and stubs discovery, jwks and token endpoints', function (
         ->and(config('oidc-client.client_id'))->toBe('oidc-client-test');
 });
 
-it('lets explicit callback values override the fake defaults', function () {
-    $fake = OidcClient::fake();
-    $callbackQuery = [];
-    parse_str((string) parse_url($fake->callbackUrl(['state' => 'custom-state']), PHP_URL_QUERY), $callbackQuery);
-
-    expect($fake->callbackContext(['oidc-client.state' => 'custom-state'])['oidc-client.state'])->toBe('custom-state')
-        ->and($callbackQuery['state'])->toBe('custom-state');
-});
-
 it('mints an id_token the real validator accepts', function () {
     $fake = OidcClient::fake();
 
